@@ -1,13 +1,11 @@
-import { getToken } from '@/libs/tool'
 import { protocol } from './protocol'
-import { WS } from '@/libs/config'
+let WS = 'ws://127.0.0.1:8000/websocket/'
 
 export class CWebSocket {
   constructor () {
-    this.sessionId = ''
     this.listenerList = {}
     this.waitingList = []
-    this.socket = new WebSocket(`${WS}?token=${getToken()}`)
+    this.socket = new WebSocket(WS)
     this.socket.onopen = (...args) => {
       this.checkWaitingList(args)
     }
@@ -22,7 +20,6 @@ export class CWebSocket {
     }
   }
   checkWaitingList (args) {
-    console.log('open', this, args)
     this.waitingList.forEach(item => {
       let protocol, data = item
       this.C2SMessage(protocol, data)
@@ -45,35 +42,28 @@ export class CWebSocket {
   }
   S2CMessage (event) {
     let msg = JSON.parse(event.data)
-    console.log('S2CMessage', msg)
-    if (!msg) return
-    if (msg.sessionId) {
-      this.sessionId = msg.sessionId
-      return
-    }
-    if (!msg.success) {
-      console.log('socket错误', msg.data)
-      return
-    }
     let { protocol, data } = msg
     if (!this.listenerList[protocol]) return
     this.listenerList[protocol].forEach(func => func(data))
   }
   C2SMessage (protocol, data) {
-    console.log(this.socket.readyState, 'C2SMessage', protocol, data)
     if (this.socket.readyState !== this.socket.OPEN) {
       this.waitingList.push([protocol, data])
       return
     }
     let msg = {
       protocol,
-      token: getToken(),
       data
     }
     this.socket.send(JSON.stringify(msg))
   }
   onerror (error) { 
     console.log('error', error)
+  }
+  clearEvent () {
+    this.socket.onopen = null
+    this.socket.onmessage = null
+    this.socket.onerror = null
   }
   close () {
     if (this.socket) {
@@ -82,7 +72,6 @@ export class CWebSocket {
       }
       this.socket.onopen = null
       this.socket.onmessage = null
-      this.socket.onerror = null
       this.socket.close()
       this.socket = null
     }
